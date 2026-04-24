@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
@@ -14,6 +14,7 @@ import {
     Grid,
     Group,
     List,
+    Loader,
     Paper,
     SimpleGrid,
     Stack,
@@ -22,9 +23,9 @@ import {
     Title,
 } from "@mantine/core";
 import { ArrowLeft, ShoppingCart, CheckCircle, Truck, Shield, Package, Box } from "lucide-react";
-import { mockCategories } from "@/lib/mockData";
+import { getProduct, getProductBadges } from "@/lib/api";
 import { storeInfo } from "@/lib/storeConfig";
-import type { Product, Category, ProductReadOnly, SelectedOption } from "@/types";
+import type { ProductReadOnly, ProductBadge, SelectedOption } from "@/types";
 import ProductCard from "@/components/catalog/ProductCard";
 import { useCart } from "@/contexts/CartContext";
 
@@ -34,58 +35,34 @@ function formatPrice(n: number) {
     }).format(n);
 }
 
-function buildProductReadOnly(product: Product, category: Category): ProductReadOnly {
-    return {
-        ...product,
-        category: { id: category.id, name: category.name, order: category.order },
-        option_groups: product.option_groups ?? [],
-    };
-}
-
-function findProductById(id: number): { product: ProductReadOnly; category: Category } | null {
-    for (const category of mockCategories) {
-        for (const product of category.products) {
-            if (product.id === id) {
-                return { product: buildProductReadOnly(product, category), category };
-            }
-        }
-    }
-    return null;
-}
-
 export default function ProductDetailPage() {
     const params = useParams<{ id: string }>();
     const router = useRouter();
     const { addItem, openCart } = useCart();
 
-    const productId = Number(params.id);
-    const match = useMemo(() => findProductById(productId), [productId]);
-
+    const [product, setProduct] = useState<ProductReadOnly | null>(null);
+    const [badges, setBadges] = useState<ProductBadge[]>([]);
+    const [loading, setLoading] = useState(true);
     const [quantity, setQuantity] = useState(1);
     const [selectedOptions, setSelectedOptions] = useState<SelectedOption[]>([]);
     const [added, setAdded] = useState<"none" | "cart" | "buy">("none");
     const [activeImage, setActiveImage] = useState<string | null>(null);
 
-    if (!match) {
-        return (
-            <div style={{ maxWidth: 960, margin: "0 auto", padding: "3rem 1.5rem" }}>
-                <Link href="/catalogo" style={{ display: "inline-flex", alignItems: "center", gap: ".5rem", color: "var(--accent)", fontWeight: 600 }}>
-                    <ArrowLeft size={16} /> Volver al catálogo
-                </Link>
-                <div style={{ marginTop: "2rem", padding: "2rem", border: "1px solid var(--border)", borderRadius: 16, background: "var(--bg-elevated)", textAlign: "center" }}>
-                    <Package size={40} style={{ color: "var(--text-muted)", marginBottom: "0.75rem" }} />
-                    <h2 style={{ marginBottom: "0.5rem" }}>Producto no encontrado</h2>
-                    <p style={{ color: "var(--text-muted)" }}>El producto que buscás no existe o ya no está disponible.</p>
-                </div>
-            </div>
-        );
-    }
+    useEffect(() => {
+        const tenant = process.env.NEXT_PUBLIC_DEFAULT_TENANT ?? "techstore";
+        setLoading(true);
+        Promise.all([
+            getProduct(params.id, undefined, tenant),
+            getProductBadges(tenant),
+        ])
+            .then(([p, b]) => { setProduct(p); setBadges(b); })
+            .catch(() => setProduct(null))
+            .finally(() => setLoading(false));
+    }, [params.id]);
 
-    const { product, category } = match;
-    const optionGroups = product.option_groups ?? [];
-
-    // Build gallery using main image + option images if color selected
+    // All hooks must be called before early returns
     const gallery = useMemo(() => {
+        if (!product) return [];
         const base = product.images && product.images.length > 0
             ? product.images
             : product.image_url
@@ -101,14 +78,41 @@ export default function ProductDetailPage() {
         return base;
     }, [product, selectedOptions]);
 
-    React.useEffect(() => {
+    useEffect(() => {
         setActiveImage((prev) => {
             if (prev && gallery.includes(prev)) return prev;
             return gallery[0] ?? null;
         });
     }, [gallery]);
 
-    function toggleOption(groupId: number, groupName: string, optionId: number, maxChoices: number) {
+    if (loading) {
+        return (
+            <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Loader size="lg" />
+            </div>
+        );
+    }
+
+    if (!product) {
+        return (
+            <div style={{ maxWidth: 960, margin: "0 auto", padding: "3rem 1.5rem" }}>
+                <Link href="/catalogo" style={{ display: "inline-flex", alignItems: "center", gap: ".5rem", color: "var(--accent)", fontWeight: 600 }}>
+                    <ArrowLeft size={16} /> Volver al catálogo
+                </Link>
+                <div style={{ marginTop: "2rem", padding: "2rem", border: "1px solid var(--border)", borderRadius: 16, background: "var(--bg-elevated)", textAlign: "center" }}>
+                    <Package size={40} style={{ color: "var(--text-muted)", marginBottom: "0.75rem" }} />
+                    <h2 style={{ marginBottom: "0.5rem" }}>Producto no encontrado</h2>
+                    <p style={{ color: "var(--text-muted)" }}>El producto que buscás no existe o ya no está disponible.</p>
+                </div>
+            </div>
+        );
+    }
+
+    // product is narrowed to ProductReadOnly beyond this point
+    const category = product.category;
+    const optionGroups = product.option_groups ?? [];
+
+    function toggleOption(groupId: string, groupName: string, optionId: string, maxChoices: number) {
         const group = optionGroups.find((g) => g.id === groupId);
         const opt = group?.options.find((o) => o.id === optionId);
         if (!group || !opt) return;
@@ -129,7 +133,7 @@ export default function ProductDetailPage() {
         });
     }
 
-    function isSelected(groupId: number, optionId: number) {
+    function isSelected(groupId: string, optionId: string) {
         return selectedOptions.some((s) => s.groupId === groupId && s.option.id === optionId);
     }
 
@@ -146,7 +150,7 @@ export default function ProductDetailPage() {
     const discountPercent = comparePrice ? Math.max(0, Math.round((1 - unitPrice / comparePrice) * 100)) : null;
 
     function handleAddToCart(openAfter: boolean) {
-        if (!requiredMet) return;
+        if (!requiredMet || !product) return;
         addItem(product, selectedOptions, quantity);
         setAdded(openAfter ? "buy" : "cart");
         if (openAfter) {
@@ -154,12 +158,7 @@ export default function ProductDetailPage() {
         }
     }
 
-    const related = useMemo(() => {
-        const sameCategory = category.products.filter((p) => p.active && p.id !== product.id).slice(0, 4);
-        if (sameCategory.length > 0) return sameCategory;
-        const others = mockCategories.flatMap((c) => c.products).filter((p) => p.active && p.id !== product.id);
-        return others.slice(0, 4);
-    }, [category.products, product.id]);
+    const related: ProductReadOnly[] = [];
 
     return (
         <Container size="lg" px="md" py="xl" style={{ minHeight: "100vh" }}>
@@ -247,8 +246,9 @@ export default function ProductDetailPage() {
                             </Group>
 
                             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-                                {storeInfo.shippingCards.map((card) => {
-                                    const icon = card.icon === "truck" ? <Truck size={18} /> : card.icon === "shield" ? <Shield size={18} /> : <Box size={18} />;
+                                {(badges.length > 0 ? badges : storeInfo.shippingCards).map((card) => {
+                                    const iconName = (card as ProductBadge).icon ?? (card as typeof storeInfo.shippingCards[0]).icon;
+                                    const icon = iconName === "truck" ? <Truck size={18} /> : iconName === "shield" ? <Shield size={18} /> : <Box size={18} />;
                                     return (
                                         <Paper key={card.title} withBorder radius="md" p="sm" bg="var(--bg-card)">
                                             <Group align="flex-start" gap="sm">
@@ -363,25 +363,31 @@ export default function ProductDetailPage() {
 
             <Divider my="xl" />
 
-            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mb="xl">
-                <Paper withBorder radius="md" p="md" bg="var(--bg-elevated)">
-                    <Title order={4} mb={8}>Características principales</Title>
-                    <List spacing={6} c="var(--text-secondary)">
-                        <List.Item>Calidad premium con garantía oficial.</List.Item>
-                        <List.Item>Envío rápido y seguro a todo el país.</List.Item>
-                        <List.Item>Soporte postventa y cambios simples.</List.Item>
-                        <List.Item>Opciones y variantes seleccionables.</List.Item>
-                    </List>
-                </Paper>
-                <Paper withBorder radius="md" p="md" bg="var(--bg-elevated)">
-                    <Title order={4} mb={8}>Detalles del envío</Title>
-                    <Stack gap={4}>
-                        {storeInfo.shippingDetails.map((line) => (
-                            <Text key={line} c="var(--text-secondary)">{line}</Text>
-                        ))}
-                    </Stack>
-                </Paper>
-            </SimpleGrid>
+            {(product.attributes?.length > 0 || storeInfo.shippingDetails.length > 0) && (
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mb="xl">
+                    {product.attributes?.length > 0 && (
+                        <Paper withBorder radius="md" p="md" bg="var(--bg-elevated)">
+                            <Title order={4} mb={8}>Características</Title>
+                            <Stack gap={4}>
+                                {[...product.attributes].sort((a, b) => a.order - b.order).map((attr) => (
+                                    <Group key={attr.id} justify="space-between" gap="xs">
+                                        <Text size="sm" c="dimmed">{attr.name}</Text>
+                                        <Text size="sm" fw={600}>{attr.value}</Text>
+                                    </Group>
+                                ))}
+                            </Stack>
+                        </Paper>
+                    )}
+                    <Paper withBorder radius="md" p="md" bg="var(--bg-elevated)">
+                        <Title order={4} mb={8}>Detalles del envío</Title>
+                        <Stack gap={4}>
+                            {storeInfo.shippingDetails.map((line) => (
+                                <Text key={line} c="var(--text-secondary)">{line}</Text>
+                            ))}
+                        </Stack>
+                    </Paper>
+                </SimpleGrid>
+            )}
 
             {related.length > 0 && (
                 <Stack gap="sm" mb="xl">

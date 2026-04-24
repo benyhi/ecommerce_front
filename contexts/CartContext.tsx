@@ -114,7 +114,7 @@ const CartContext = createContext<CartContextType>({} as CartContextType);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
-function buildCartItemId(productId: number, selectedOptions: SelectedOption[]) {
+function buildCartItemId(productId: string, selectedOptions: SelectedOption[]) {
     const opts = selectedOptions
         .map((s) => `${s.groupId}:${s.option.id}`)
         .sort()

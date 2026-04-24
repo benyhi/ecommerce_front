@@ -4,6 +4,7 @@ import React from "react";
 import { X, Minus, Plus, ShoppingCart, Trash2, CreditCard } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import Image from "next/image";
+import Link from "next/link";
 
 function formatPrice(n: number) {
     return new Intl.NumberFormat("es-AR", {
@@ -258,13 +259,15 @@ export default function CartDrawer() {
                                 {formatPrice(total)}
                             </span>
                         </div>
-                        <button
+                        <Link
+                            href="/checkout"
+                            onClick={closeCart}
                             className="btn-primary"
-                            style={{ width: "100%", justifyContent: "center", padding: ".8rem" }}
+                            style={{ width: "100%", justifyContent: "center", padding: ".8rem", textDecoration: "none", display: "flex", alignItems: "center", gap: ".4rem" }}
                         >
                             <CreditCard size={16} />
                             Proceder al pago
-                        </button>
+                        </Link>
                     </div>
                 )}
             </div>

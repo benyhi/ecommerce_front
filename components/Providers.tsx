@@ -9,7 +9,7 @@ import { mantineTheme } from "@/lib/mantineTheme";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <MantineProvider theme={mantineTheme}>
+    <MantineProvider theme={mantineTheme} forceColorScheme="light">
       <Notifications position="top-right" />
       <ThemeProvider>
         <AuthProvider>

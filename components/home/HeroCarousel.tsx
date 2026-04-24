@@ -3,14 +3,51 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { promoSlides } from "@/lib/mockData";
+import type { CarouselBannerPublic } from "@/types";
 import Link from "next/link";
 
-export default function HeroCarousel() {
+type Slide = {
+    id: string | number;
+    title: string;
+    subtitle: string;
+    description: string;
+    image: string;
+    cta: string;
+    link?: string;
+};
+
+function bannersToSlides(banners: CarouselBannerPublic[]): Slide[] {
+    return banners.map((b) => ({
+        id: b.id,
+        title: b.title,
+        subtitle: b.subtitle,
+        description: b.description,
+        image: b.image_url,
+        cta: b.button_text || "Ver más",
+        link: b.link_url || "/catalogo",
+    }));
+}
+
+type HeroCarouselProps = {
+    banners?: CarouselBannerPublic[];
+};
+
+export default function HeroCarousel({ banners }: HeroCarouselProps) {
+    // Use API banners if provided and non-empty, otherwise fall back to mock slides
+    const slides: Slide[] =
+        banners && banners.length > 0
+            ? bannersToSlides(banners)
+            : promoSlides.map((s) => ({ ...s, id: s.id, link: "/catalogo" }));
+
     const [current, setCurrent] = useState(0);
     const [paused, setPaused] = useState(false);
 
-    const next = useCallback(() => setCurrent((c) => (c + 1) % promoSlides.length), []);
-    const prev = () => setCurrent((c) => (c - 1 + promoSlides.length) % promoSlides.length);
+    const next = useCallback(() => setCurrent((c) => (c + 1) % slides.length), [slides.length]);
+    const prev = () => setCurrent((c) => (c - 1 + slides.length) % slides.length);
+
+    useEffect(() => {
+        setCurrent(0);
+    }, [slides.length]);
 
     useEffect(() => {
         if (paused) return;
@@ -18,7 +55,7 @@ export default function HeroCarousel() {
         return () => clearInterval(id);
     }, [paused, next]);
 
-    const slide = promoSlides[current];
+    const slide = slides[current];
 
     return (
         <div
@@ -26,7 +63,7 @@ export default function HeroCarousel() {
             onMouseEnter={() => setPaused(true)}
             onMouseLeave={() => setPaused(false)}
         >
-            {promoSlides.map((s, i) => (
+            {slides.map((s, i) => (
                 <div
                     key={s.id}
                     style={{
@@ -110,7 +147,7 @@ export default function HeroCarousel() {
                         {slide.description}
                     </p>
                     <Link
-                        href="/catalogo"
+                        href={slide.link ?? "/catalogo"}
                         className="btn-primary"
                         style={{ fontSize: "1rem", padding: ".85rem 2rem", borderRadius: 12 }}
                     >
@@ -158,7 +195,7 @@ export default function HeroCarousel() {
                     zIndex: 3, display: "flex", gap: ".5rem",
                 }}
             >
-                {promoSlides.map((_, i) => (
+                {slides.map((_, i) => (
                     <button
                         key={i}
                         onClick={() => setCurrent(i)}

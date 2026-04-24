@@ -88,7 +88,7 @@ export default function ProductModal({ product, onClose }: Props) {
     const totalPrice = unitPrice * quantity;
     const discountPercent = compareUnitPrice ? Math.max(0, Math.round((1 - unitPrice / compareUnitPrice) * 100)) : null;
 
-    function toggleOption(groupId: number, groupName: string, optionId: number, maxChoices: number) {
+    function toggleOption(groupId: string, groupName: string, optionId: string, maxChoices: number) {
         const opt = optionGroups
             .find((g) => g.id === groupId)?.options
             .find((o) => o.id === optionId);
@@ -113,7 +113,7 @@ export default function ProductModal({ product, onClose }: Props) {
         });
     }
 
-    function isSelected(groupId: number, optionId: number) {
+    function isSelected(groupId: string, optionId: string) {
         return selectedOptions.some((s) => s.groupId === groupId && s.option.id === optionId);
     }
 

@@ -4,7 +4,6 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
-import { ColorSchemeScript } from "@mantine/core";
 import { BrandProvider } from "@/contexts/BrandContext";
 import { Providers } from "@/components/Providers";
 import Navbar from "@/components/layout/Navbar";
@@ -58,7 +57,8 @@ export default async function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
-        <ColorSchemeScript />
+        {/* Apply dark class synchronously before React hydrates to prevent flash */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(t==null&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}}catch(e){}})();` }} />
       </head>
       <body className={inter.variable} style={getBrandCssStyle(branding)}>
         <BrandProvider branding={branding}>

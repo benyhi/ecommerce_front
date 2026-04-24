@@ -1,11 +1,11 @@
-import type { Category, ProductReadOnly, LoginResponse, BrandConfig } from "@/types";
+import type { Category, ProductReadOnly, ProductBadge, LoginResponse, BrandConfig, CarouselBannerPublic, FeaturedProductPublic, Post } from "@/types";
 import type { User } from "@/types";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api").replace(
     /\/+$/,
     ""
 );
-const DEFAULT_TENANT = "tienda1";
+const DEFAULT_TENANT = "techstore";
 const AUTH_LOGIN_PATH = "/auth/login/";
 
 // ─── Core fetch wrapper ───────────────────────────────────────────────────
@@ -56,15 +56,31 @@ export async function getCategories(
     token?: string,
     tenantSlug?: string
 ): Promise<Category[]> {
-    return apiFetch<Category[]>("/menu/categories/", { token, tenantSlug });
+    const res = await apiFetch<Category[] | { results: Category[] }>(
+        "/catalog/categories/",
+        { token, tenantSlug }
+    );
+    return Array.isArray(res) ? res : res.results ?? [];
+}
+
+export async function getProductBadges(tenantSlug?: string): Promise<ProductBadge[]> {
+    try {
+        const res = await apiFetch<ProductBadge[] | { results: ProductBadge[] }>(
+            "/catalog/badges/",
+            { tenantSlug }
+        );
+        return Array.isArray(res) ? res : res.results ?? [];
+    } catch {
+        return [];
+    }
 }
 
 export async function getProduct(
-    id: number,
+    id: string,
     token?: string,
     tenantSlug?: string
 ): Promise<ProductReadOnly> {
-    return apiFetch<ProductReadOnly>(`/menu/products/${id}/`, {
+    return apiFetch<ProductReadOnly>(`/catalog/products/${id}/`, {
         token,
         tenantSlug,
     });
@@ -117,6 +133,44 @@ export async function updateTenantBrandingConfig(
 
     const payload = (await res.json()) as TenantBrandingApiResponse;
     return payload.branding;
+}
+
+// ─── Site / Homepage endpoints ───────────────────────────────────────────────
+
+export async function getSiteBanners(tenantSlug?: string): Promise<CarouselBannerPublic[]> {
+    try {
+        const res = await apiFetch<CarouselBannerPublic[] | { results: CarouselBannerPublic[] }>(
+            "/site/banners/",
+            { tenantSlug }
+        );
+        return Array.isArray(res) ? res : res.results ?? [];
+    } catch {
+        return [];
+    }
+}
+
+export async function getFeaturedProducts(tenantSlug?: string): Promise<FeaturedProductPublic[]> {
+    try {
+        const res = await apiFetch<FeaturedProductPublic[] | { results: FeaturedProductPublic[] }>(
+            "/site/featured/",
+            { tenantSlug }
+        );
+        return Array.isArray(res) ? res : res.results ?? [];
+    } catch {
+        return [];
+    }
+}
+
+export async function getSitePosts(tenantSlug?: string): Promise<Post[]> {
+    try {
+        const res = await apiFetch<Post[] | { results: Post[] }>(
+            "/site/posts/",
+            { tenantSlug }
+        );
+        return Array.isArray(res) ? res : res.results ?? [];
+    } catch {
+        return [];
+    }
 }
 
 // ─── Auth endpoints ───────────────────────────────────────────────────────

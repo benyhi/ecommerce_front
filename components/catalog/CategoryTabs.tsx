@@ -6,8 +6,8 @@ import type { Category } from "@/types";
 
 interface Props {
     categories: Category[];
-    activeId: number | null;
-    onSelect: (id: number | null) => void;
+    activeId: string | null;
+    onSelect: (id: string | null) => void;
 }
 
 export default function CategoryTabs({ categories, activeId, onSelect }: Props) {

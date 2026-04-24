@@ -5,8 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ArrowRight, TrendingUp, Tag } from "lucide-react";
-import { mockCategories, featuredProductIds } from "@/lib/mockData";
-import type { Product } from "@/types";
+import type { FeaturedProductPublic, Product } from "@/types";
 
 function formatPrice(p: string) {
     return new Intl.NumberFormat("es-AR", {
@@ -14,28 +13,17 @@ function formatPrice(p: string) {
     }).format(parseFloat(p));
 }
 
-const badges = [
-    { ids: [1, 3], label: "🔥 Más vendido", cls: "badge-danger" },
-    { ids: [4, 7], label: "⭐ Destacado", cls: "badge-accent" },
-    { ids: [9, 12], label: "💸 Oferta", cls: "badge-success" },
-];
+type FeaturedProductsProps = {
+    items?: FeaturedProductPublic[];
+};
 
-function getBadge(id: number) {
-    for (const b of badges) {
-        if (b.ids.includes(id)) return b;
-    }
-    return null;
-}
-
-export default function FeaturedProducts() {
+export default function FeaturedProducts({ items }: FeaturedProductsProps) {
     const router = useRouter();
 
-    const featured: Product[] = [];
-    for (const cat of mockCategories) {
-        for (const p of cat.products) {
-            if (featuredProductIds.includes(p.id)) featured.push(p);
-        }
-    }
+    const featured: Product[] = (items ?? [])
+        .filter((i) => i.product_detail !== null)
+        .map((i) => i.product_detail as unknown as Product)
+        .sort((a, b) => a.order - b.order);
 
     return (
         <section style={{ padding: "5rem 0", background: "var(--bg-primary)" }}>
@@ -77,17 +65,14 @@ export default function FeaturedProducts() {
                         gap: "1.25rem",
                     }}
                 >
-                    {featured.map((product) => {
-                        const badge = getBadge(product.id);
-                        return (
-                            <ProductCard
-                                key={product.id}
-                                product={product}
-                                badge={badge}
-                                onOpen={() => router.push(`/catalogo/${product.id}`)}
-                            />
-                        );
-                    })}
+                    {featured.map((product) => (
+                        <ProductCard
+                            key={product.id}
+                            product={product}
+                            badge={null}
+                            onOpen={() => router.push(`/catalogo/${product.id}`)}
+                        />
+                    ))}
                 </div>
 
                 {/* CTA banner */}

@@ -3,10 +3,10 @@
 import React, { useState, useMemo, useEffect } from "react";
 import {
     Badge,
-    Box,
     Button,
     Drawer,
     Group,
+    Loader,
     Stack,
     Text,
 } from "@mantine/core";
@@ -14,14 +14,14 @@ import { useMediaQuery } from "@mantine/hooks";
 import SearchBar from "@/components/catalog/SearchBar";
 import ProductCard from "@/components/catalog/ProductCard";
 import AdvancedFilters, { type SortOption } from "@/components/catalog/AdvancedFilters";
-import { mockCategories } from "@/lib/mockData";
+import { getCategories } from "@/lib/api";
 import type { Product, Category } from "@/types";
 import { Package } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function CatalogoPage() {
     const [search, setSearch] = useState("");
-    const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
+    const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
     const router = useRouter();
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const [priceMinFilter, setPriceMinFilter] = useState<number | null>(null);
@@ -31,18 +31,26 @@ export default function CatalogoPage() {
     const [onlyOffers, setOnlyOffers] = useState(false);
     const [filtersOpen, setFiltersOpen] = useState(true);
     const isMobile = useMediaQuery("(max-width: 960px)");
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [loadingCategories, setLoadingCategories] = useState(true);
 
     useEffect(() => {
         setFiltersOpen(!isMobile);
     }, [isMobile]);
+
+    useEffect(() => {
+        const tenant = process.env.NEXT_PUBLIC_DEFAULT_TENANT ?? "techstore";
+        getCategories(undefined, tenant)
+            .then((data) => setCategories(data.filter((c) => c.active)))
+            .catch(() => setCategories([]))
+            .finally(() => setLoadingCategories(false));
+    }, []);
 
     // Debounce search
     useEffect(() => {
         const id = setTimeout(() => setDebouncedSearch(search), 300);
         return () => clearTimeout(id);
     }, [search]);
-
-    const categories = mockCategories.filter((c) => c.active);
 
     const allActiveProducts = useMemo(() => {
         const list: Array<{ product: Product; category: Category }> = [];
@@ -118,7 +126,7 @@ export default function CatalogoPage() {
 
     // Group filtered products by category for display
     const groupedByCategory = useMemo(() => {
-        const map = new Map<number, { category: Category; products: Product[] }>();
+        const map = new Map<string, { category: Category; products: Product[] }>();
         for (const { product, category } of filteredProducts) {
             if (!map.has(category.id)) {
                 map.set(category.id, { category, products: [] });
@@ -147,6 +155,14 @@ export default function CatalogoPage() {
 
     function openProduct(product: Product) {
         router.push(`/catalogo/${product.id}`);
+    }
+
+    if (loadingCategories) {
+        return (
+            <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Loader size="lg" />
+            </div>
+        );
     }
 
     return (

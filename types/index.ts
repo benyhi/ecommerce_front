@@ -1,7 +1,7 @@
 // ─── API Types (match Django REST backend) ────────────────────────────────
 
 export interface Option {
-  id: number;
+  id: string;
   name: string;
   price: string;
   active: boolean;
@@ -13,7 +13,7 @@ export interface Option {
 }
 
 export interface OptionGroup {
-  id: number;
+  id: string;
   name: string;
   required: boolean;
   max_choices: number;
@@ -22,7 +22,7 @@ export interface OptionGroup {
 }
 
 export interface Product {
-  id: number;
+  id: string;
   name: string;
   description: string;
   price: string;
@@ -44,19 +44,36 @@ export interface Product {
   option_groups?: OptionGroup[];
 }
 
+export interface ProductAttribute {
+  id: string;
+  name: string;
+  value: string;
+  order: number;
+}
+
+export interface ProductBadge {
+  id: string;
+  title: string;
+  description: string;
+  icon: "truck" | "shield" | "box" | "check" | "star" | "zap";
+  active: boolean;
+  order: number;
+}
+
 export interface ProductReadOnly extends Product {
   category: CategoryBasic;
   option_groups: OptionGroup[];
+  attributes: ProductAttribute[];
 }
 
 export interface CategoryBasic {
-  id: number;
+  id: string;
   name: string;
   order: number;
 }
 
 export interface Category {
-  id: number;
+  id: string;
   name: string;
   active: boolean;
   order: number;
@@ -130,10 +147,48 @@ export interface LoginResponse {
   user: User;
 }
 
+// ─── Site / Homepage ─────────────────────────────────────────────────────────
+
+export interface CarouselBannerPublic {
+  id: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  image_url: string;
+  link_url: string;
+  button_text: string;
+  order: number;
+  active: boolean;
+}
+
+export interface FeaturedProductPublic {
+  id: string;
+  product: string;
+  product_detail: ProductReadOnly | null;
+  order: number;
+  active: boolean;
+}
+
+// ─── Site / Posts ────────────────────────────────────────────────────────────
+
+export interface Post {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string;
+  content: string;
+  image_url: string;
+  published_at: string | null;
+  active: boolean;
+  order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 // ─── Cart ────────────────────────────────────────────────────────────────
 
 export interface SelectedOption {
-  groupId: number;
+  groupId: string;
   groupName: string;
   option: Option;
 }

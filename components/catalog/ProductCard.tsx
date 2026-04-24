@@ -2,8 +2,7 @@
 
 import React from "react";
 import Image from "next/image";
-import { Eye } from "lucide-react";
-import { featuredProductIds } from "@/lib/mockData";
+import { Eye, ShoppingCart } from "lucide-react";
 import type { Product } from "@/types";
 
 function formatPrice(p: string) {
@@ -27,9 +26,7 @@ export default function ProductCard({ product, onClick, badge }: Props) {
             : null;
     const hasDiscount = comparePrice !== null && comparePrice > price;
     const discountPercent = hasDiscount ? Math.max(0, Math.round((1 - price / comparePrice) * 100)) : null;
-    const isFeatured = featuredProductIds.includes(product.id);
-    const featuredTop = "0.6rem";
-    const discountTop = isFeatured ? "2.6rem" : "0.6rem";
+    const discountTop = "0.6rem";
 
     return (
         <div
@@ -70,15 +67,6 @@ export default function ProductCard({ product, onClick, badge }: Props) {
                         style={{ position: "absolute", top: ".6rem", left: ".6rem" }}
                     >
                         {badge}
-                    </span>
-                )}
-
-                {isFeatured && (
-                    <span
-                        className="badge"
-                        style={{ position: "absolute", top: featuredTop, right: ".6rem", background: "var(--accent)", color: "#fff", fontWeight: 700 }}
-                    >
-                        Destacado
                     </span>
                 )}
 

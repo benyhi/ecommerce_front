@@ -33,8 +33,8 @@ interface Props {
     onlyOffers: boolean;
     onToggleOffers: () => void;
     categories: Category[];
-    activeCategoryId: number | null;
-    onSelectCategory: (id: number | null) => void;
+    activeCategoryId: string | null;
+    onSelectCategory: (id: string | null) => void;
     appliedCount: number;
     onReset: () => void;
     isMobile?: boolean;
@@ -151,7 +151,7 @@ export default function AdvancedFilters(props: Props) {
                             <Text fw={600}>Categorías</Text>
                             <Badge size="sm" variant="light" color="gray">{categories.length}</Badge>
                         </Group>
-                        <Radio.Group value={activeCategoryId === null ? "all" : String(activeCategoryId)} onChange={(val) => onSelectCategory(val === "all" ? null : Number(val))}>
+                        <Radio.Group value={activeCategoryId === null ? "all" : activeCategoryId} onChange={(val) => onSelectCategory(val === "all" ? null : val)}>
                             <Stack gap={6}>
                                 <Radio value="all" label="Todas" />
                                 {categories.map((cat) => (

@@ -4,13 +4,56 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { useCart } from "@/contexts/CartContext";
-import { initiatePayment, getEnabledGateways, type GatewayConfig, type GatewayId } from "@/lib/payments";
-import { ArrowLeft, CreditCard, Landmark, Smartphone, Banknote, ShoppingCart, Loader2 } from "lucide-react";
+import { initiatePayment, validateCoupon, getEnabledGateways, type GatewayConfig, type GatewayId, type CouponValidationResult } from "@/lib/payments";
+import { ArrowLeft, CreditCard, Landmark, Smartphone, Banknote, ShoppingCart, Loader2, Tag, X, CheckCircle, AlertCircle } from "lucide-react";
+
+const MPCardBrick = dynamic(() => import("@/components/checkout/MPCardBrick"), { ssr: false, loading: () => null });
 
 function formatPrice(n: number) {
   return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 0 }).format(n);
 }
+
+function parsePaymentError(err: unknown): string {
+  if (!(err instanceof Error)) return "Error inesperado. Intente nuevamente.";
+
+  // apiFetch lanza: "API error 4XX: <json body>"
+  const match = err.message.match(/^API error (\d+): (.+)$/s);
+  if (match) {
+    const statusCode = parseInt(match[1], 10);
+    let body: Record<string, unknown> = {};
+    try { body = JSON.parse(match[2]); } catch { /* body no es JSON */ }
+
+    // Extraer mensaje del body
+    const msg =
+      (body.error as string) ||
+      (body.detail as string) ||
+      (Array.isArray(body.non_field_errors) ? (body.non_field_errors as string[]).join(", ") : undefined) ||
+      (body.message as string);
+
+    if (msg) return msg;
+
+    // Mensajes por código HTTP
+    if (statusCode === 400) return "Los datos enviados son inválidos. Verificá los campos e intentá nuevamente.";
+    if (statusCode === 404) return "El recurso solicitado no fue encontrado. Verificá la configuración de pago.";
+    if (statusCode === 422) return "Hubo un error al procesar tu solicitud. Verificá los datos e intentá de nuevo.";
+    if (statusCode >= 500) return "El servidor tuvo un problema. Intente nuevamente en unos minutos.";
+    return `Error ${statusCode}. Intente nuevamente.`;
+  }
+
+  if (err.message.toLowerCase().includes("failed to fetch") || err.message.toLowerCase().includes("network")) {
+    return "Sin conexión a internet. Verificá tu conexión e intentá nuevamente.";
+  }
+
+  return err.message || "Error inesperado. Intente nuevamente.";
+}
+
+type RedirectState = {
+  active: boolean;
+  destination: string;
+  message: string;
+};
 
 const GATEWAY_META: Record<GatewayId, { label: string; description: string; Icon: React.FC<{ size?: number }> }> = {
   mercadopago: { label: "MercadoPago", description: "Tarjetas, Mercado Crédito, saldo MP", Icon: Smartphone },
@@ -44,6 +87,13 @@ export default function CheckoutPage() {
   const [loadingGateways, setLoadingGateways] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+
+  const [redirect, setRedirect] = useState<RedirectState>({ active: false, destination: "", message: "" });
+
   useEffect(() => {
     closeCart();
     getEnabledGateways().then((list) => {
@@ -52,20 +102,73 @@ export default function CheckoutPage() {
     }).finally(() => setLoadingGateways(false));
   }, [closeCart]);
 
-  const isCardGateway = selectedGateway === "card" || selectedGateway === "mercadopago";
+  // mercadopago usa el Card Payment Brick (maneja cuotas internamente)
+  const isCardGateway = selectedGateway === "card" || selectedGateway === "debit";
+  const discount = appliedCoupon ? parseFloat(appliedCoupon.discount_amount ?? "0") : 0;
+  const finalTotal = Math.max(0, total - discount);
+
+  async function handleApplyCoupon() {
+    const code = couponCode.trim();
+    if (!code) return;
+    setCouponLoading(true);
+    setCouponError(null);
+    try {
+      const result = await validateCoupon(code, total);
+      if (result.valid) {
+        setAppliedCoupon(result);
+        setCouponError(null);
+      } else {
+        setCouponError(result.message);
+        setAppliedCoupon(null);
+      }
+    } catch {
+      setCouponError("Error al validar el cupón. Intente nuevamente.");
+      setAppliedCoupon(null);
+    } finally {
+      setCouponLoading(false);
+    }
+  }
+
+  function handleRemoveCoupon() {
+    setAppliedCoupon(null);
+    setCouponCode("");
+    setCouponError(null);
+  }
+
+  function handleMPCardSuccess(paymentId: string, paymentStatus: string) {
+    clearCart();
+    if (paymentStatus === "approved") {
+      setRedirect({ active: true, destination: "confirmación", message: "¡Pago aprobado! Redirigiendo a la confirmación." });
+      setTimeout(() => router.push(`/checkout/exito?payment_id=${paymentId}`), 1800);
+    } else if (paymentStatus === "pending" || paymentStatus === "in_process") {
+      setRedirect({ active: true, destination: "estado del pago", message: "Pago en proceso. Redirigiendo al estado del pago." });
+      setTimeout(() => router.push(`/checkout/pendiente?payment_id=${paymentId}`), 1800);
+    } else {
+      setError("El pago fue rechazado. Por favor, intentá con otra tarjeta.");
+    }
+  }
+
+  function handleMPCardError(msg: string) {
+    setError(msg);
+  }
 
   async function handlePay() {
     if (!selectedGateway || items.length === 0) return;
+
+    if (!payerName.trim()) { setError("Por favor ingresá tu nombre completo."); return; }
+    if (!payerEmail.trim() || !payerEmail.includes("@")) { setError("Por favor ingresá un email válido."); return; }
+
     setLoading(true);
     setError(null);
     try {
       const result = await initiatePayment({
         gateway: selectedGateway,
-        amount: total,
+        amount: finalTotal,
         payer_name: payerName,
         payer_email: payerEmail,
         payer_phone: payerPhone,
         installments: isCardGateway ? installments : 1,
+        coupon_code: appliedCoupon?.code ?? undefined,
         cart_items: items.map((i) => ({
           product_id: i.product.id,
           product_name: i.product.name,
@@ -75,27 +178,44 @@ export default function CheckoutPage() {
       });
 
       if (result.success) {
+        clearCart();
         if (result.checkout_url) {
-          // MercadoPago → redirigir a MP
-          clearCart();
-          window.location.href = result.checkout_url;
+          setRedirect({ active: true, destination: "MercadoPago", message: "Será redirigido a MercadoPago para completar el pago de forma segura." });
+          setTimeout(() => { window.location.href = result.checkout_url!; }, 1800);
         } else if (selectedGateway === "transfer") {
-          // Transferencia → mostrar datos bancarios
-          clearCart();
-          router.push(`/checkout/pendiente?payment_id=${result.payment_id}`);
+          setRedirect({ active: true, destination: "instrucciones de transferencia", message: "Pago registrado. Será redirigido a las instrucciones de transferencia." });
+          setTimeout(() => router.push(`/checkout/pendiente?payment_id=${result.payment_id}`), 1800);
         } else {
-          // Card / debit (posnet) → confirmación directa
-          clearCart();
-          router.push(`/checkout/exito?payment_id=${result.payment_id}`);
+          setRedirect({ active: true, destination: "confirmación", message: "¡Pago registrado correctamente! Redirigiendo a la confirmación." });
+          setTimeout(() => router.push(`/checkout/exito?payment_id=${result.payment_id}`), 1800);
         }
       } else {
-        setError(result.error ?? "Error al procesar el pago. Intente nuevamente.");
+        const msg = result.error ?? "No se pudo procesar el pago.";
+        setError(msg);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error inesperado. Intente nuevamente.");
+      setError(parsePaymentError(err));
     } finally {
       setLoading(false);
     }
+  }
+
+  if (redirect.active) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
+        <div style={{ maxWidth: 480, textAlign: "center" }}>
+          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "rgba(34,197,94,.12)", border: "2px solid rgba(34,197,94,.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1.5rem" }}>
+            <CheckCircle size={36} style={{ color: "#22c55e" }} />
+          </div>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: 800, marginBottom: ".75rem" }}>¡Todo listo!</h2>
+          <p style={{ color: "var(--text-muted)", marginBottom: "2rem", lineHeight: 1.6 }}>{redirect.message}</p>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: ".6rem", color: "var(--text-muted)", fontSize: ".9rem" }}>
+            <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+            Redirigiendo a {redirect.destination}...
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (items.length === 0) {
@@ -145,6 +265,46 @@ export default function CheckoutPage() {
                   style={inputStyle}
                 />
               </div>
+            </section>
+
+            {/* Cupón de descuento */}
+            <section style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 16, padding: "1.5rem" }}>
+              <h2 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "1rem" }}>Cupón de descuento</h2>
+              {appliedCoupon ? (
+                <div style={{ display: "flex", alignItems: "center", gap: ".75rem", padding: ".75rem 1rem", background: "rgba(34,197,94,.08)", border: "1px solid rgba(34,197,94,.3)", borderRadius: 10 }}>
+                  <Tag size={18} style={{ color: "#22c55e", flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: 0, fontWeight: 700, color: "#22c55e" }}>{appliedCoupon.code}</p>
+                    <p style={{ margin: 0, fontSize: ".8rem", color: "var(--text-muted)" }}>
+                      Descuento: {formatPrice(discount)}
+                    </p>
+                  </div>
+                  <button onClick={handleRemoveCoupon} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "var(--text-muted)" }}>
+                    <X size={16} />
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: ".5rem" }}>
+                  <input
+                    type="text"
+                    placeholder="Código de cupón"
+                    value={couponCode}
+                    onChange={(e) => { setCouponCode(e.target.value); setCouponError(null); }}
+                    onKeyDown={(e) => e.key === "Enter" && handleApplyCoupon()}
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  <button
+                    onClick={handleApplyCoupon}
+                    disabled={couponLoading || !couponCode.trim()}
+                    style={{ padding: ".7rem 1.25rem", background: "var(--accent)", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, cursor: couponLoading || !couponCode.trim() ? "not-allowed" : "pointer", opacity: couponLoading || !couponCode.trim() ? .6 : 1, whiteSpace: "nowrap", fontSize: ".9rem" }}
+                  >
+                    {couponLoading ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> : "Aplicar"}
+                  </button>
+                </div>
+              )}
+              {couponError && (
+                <p style={{ margin: ".5rem 0 0", fontSize: ".85rem", color: "#ef4444" }}>{couponError}</p>
+              )}
             </section>
 
             {/* Método de pago */}
@@ -204,7 +364,7 @@ export default function CheckoutPage() {
                   </select>
                   {installments > 1 && (
                     <p style={{ margin: ".4rem 0 0", fontSize: ".8rem", color: "var(--text-muted)" }}>
-                      {formatPrice(total / installments)} × {installments} cuotas
+                      {formatPrice(finalTotal / installments)} × {installments} cuotas
                     </p>
                   )}
                 </div>
@@ -212,19 +372,39 @@ export default function CheckoutPage() {
             </section>
 
             {error && (
-              <div style={{ background: "rgba(239,68,68,.08)", border: "1px solid rgba(239,68,68,.3)", borderRadius: 10, padding: "1rem", color: "#ef4444", fontSize: ".9rem" }}>
-                {error}
+              <div style={{ background: "rgba(239,68,68,.08)", border: "1px solid rgba(239,68,68,.35)", borderRadius: 12, padding: "1rem 1.25rem", display: "flex", gap: ".75rem", alignItems: "flex-start" }}>
+                <AlertCircle size={20} style={{ color: "#ef4444", flexShrink: 0, marginTop: 1 }} />
+                <div>
+                  <p style={{ margin: "0 0 .2rem", fontWeight: 700, color: "#ef4444", fontSize: ".9rem" }}>No se pudo procesar el pago</p>
+                  <p style={{ margin: 0, color: "#ef4444", fontSize: ".85rem", lineHeight: 1.5 }}>{error}</p>
+                </div>
+                <button onClick={() => setError(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", padding: 2, marginLeft: "auto", flexShrink: 0 }}>
+                  <X size={16} />
+                </button>
               </div>
             )}
 
-            <button
-              onClick={handlePay}
-              disabled={loading || !selectedGateway || gateways.length === 0}
-              className="btn-primary"
-              style={{ justifyContent: "center", padding: "1rem", fontSize: "1rem", opacity: loading ? .7 : 1 }}
-            >
-              {loading ? <><Loader2 size={18} style={{ animation: "spin 1s linear infinite", marginRight: 8 }} />Procesando...</> : <><CreditCard size={18} style={{ marginRight: 8 }} />Pagar {formatPrice(total)}</>}
-            </button>
+            {selectedGateway === "mercadopago" ? (
+              <MPCardBrick
+                amount={finalTotal}
+                payerName={payerName}
+                payerEmail={payerEmail}
+                onSuccess={handleMPCardSuccess}
+                onPaymentError={handleMPCardError}
+              />
+            ) : (
+              <button
+                onClick={handlePay}
+                disabled={loading || !selectedGateway || gateways.length === 0}
+                className="btn-primary"
+                style={{ justifyContent: "center", padding: "1rem", fontSize: "1rem", opacity: loading || !selectedGateway ? .7 : 1 }}
+              >
+                {loading
+                  ? <><Loader2 size={18} style={{ animation: "spin 1s linear infinite", marginRight: 8 }} />Procesando pago...</>
+                  : <><CreditCard size={18} style={{ marginRight: 8 }} />Pagar {formatPrice(finalTotal)}</>
+                }
+              </button>
+            )}
           </div>
 
           {/* Right: Order summary */}
@@ -248,10 +428,20 @@ export default function CheckoutPage() {
                 </div>
               ))}
             </div>
-            <div style={{ borderTop: "1px solid var(--border)", marginTop: "1rem", paddingTop: "1rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: "1.1rem" }}>
-                <span>Total</span>
+            <div style={{ borderTop: "1px solid var(--border)", marginTop: "1rem", paddingTop: "1rem", display: "flex", flexDirection: "column", gap: ".5rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: ".9rem", color: "var(--text-muted)" }}>
+                <span>Subtotal</span>
                 <span>{formatPrice(total)}</span>
+              </div>
+              {discount > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: ".9rem", color: "#22c55e" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: ".3rem" }}><Tag size={14} /> {appliedCoupon?.code}</span>
+                  <span>− {formatPrice(discount)}</span>
+                </div>
+              )}
+              <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: "1.1rem", borderTop: discount > 0 ? "1px solid var(--border)" : undefined, paddingTop: discount > 0 ? ".5rem" : undefined }}>
+                <span>Total</span>
+                <span>{formatPrice(finalTotal)}</span>
               </div>
             </div>
           </aside>

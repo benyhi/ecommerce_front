@@ -13,6 +13,7 @@
     "@mantine/form": "^7.17.8",
     "@mantine/hooks": "^7.17.8",
     "@mantine/notifications": "^7.17.8",
+    "@mercadopago/sdk-react": "^1.0.7",
     "lucide-react": "^0.575.0",
     "next": "16.1.6",
     "react": "19.2.3",

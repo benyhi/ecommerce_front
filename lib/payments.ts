@@ -29,6 +29,16 @@ export interface InitiatePaymentPayload {
   order_id?: string;
   cart_items?: CartItemPayload[];
   notes?: string;
+  coupon_code?: string;
+}
+
+export interface CouponValidationResult {
+  valid: boolean;
+  code?: string;
+  discount_type?: "percentage" | "fixed";
+  value?: string;
+  discount_amount?: string;
+  message: string;
 }
 
 export interface InitiatePaymentResponse {
@@ -81,4 +91,42 @@ export async function getPaymentStatus(
 ): Promise<PaymentStatus> {
   const slug = tenantSlug ?? DEFAULT_TENANT;
   return apiFetch<PaymentStatus>(`/payments/${paymentId}/status/`, { tenantSlug: slug });
+}
+
+export interface MPCardPaymentPayload {
+  amount: number;
+  card_token: string;
+  payment_method_id: string;
+  installments?: number;
+  payer_name?: string;
+  payer_email?: string;
+  order_id?: string;
+}
+
+export async function getMPPublicKey(tenantSlug?: string): Promise<string> {
+  const slug = tenantSlug ?? DEFAULT_TENANT;
+  const res = await apiFetch<{ public_key: string }>("/payments/mp-public-key/", { tenantSlug: slug });
+  return res.public_key;
+}
+
+export async function initiateMPCardPayment(
+  payload: MPCardPaymentPayload,
+  tenantSlug?: string
+): Promise<InitiatePaymentResponse> {
+  const slug = tenantSlug ?? DEFAULT_TENANT;
+  return apiFetch<InitiatePaymentResponse>("/payments/mp-card/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    tenantSlug: slug,
+  });
+}
+
+export async function validateCoupon(
+  code: string,
+  amount: number,
+  tenantSlug?: string
+): Promise<CouponValidationResult> {
+  const slug = tenantSlug ?? DEFAULT_TENANT;
+  const params = new URLSearchParams({ code: code.trim().toUpperCase(), amount: String(amount) });
+  return apiFetch<CouponValidationResult>(`/coupons/validate/?${params}`, { tenantSlug: slug });
 }

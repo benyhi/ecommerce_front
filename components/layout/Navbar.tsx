@@ -78,16 +78,6 @@ export default function Navbar() {
                 </Badge>
             </Box>
             <Box style={{ padding: ".5rem" }}>
-                {(user?.role === "admin" || user?.role === "editor") && (
-                    <MenuBtn
-                        icon={<Settings size={14} />}
-                        label="Branding"
-                        onClick={() => {
-                            setUserMenuOpen(false);
-                            window.location.href = "/admin/branding";
-                        }}
-                    />
-                )}
                 <MenuBtn icon={<Settings size={14} />} label="Perfil" onClick={() => setUserMenuOpen(false)} />
                 <MenuBtn icon={<LogOut size={14} />} label="Cerrar sesión" onClick={handleLogout} danger />
             </Box>

@@ -10,6 +10,7 @@ interface Props {
   payerName: string;
   payerEmail: string;
   tenantSlug?: string;
+  onPrepareOrder?: () => Promise<string>;
   onSuccess: (paymentId: string, status: string) => void;
   onPaymentError: (error: string) => void;
 }
@@ -22,6 +23,7 @@ export default function MPCardBrick({
   payerName,
   payerEmail,
   tenantSlug,
+  onPrepareOrder,
   onSuccess,
   onPaymentError,
 }: Props) {
@@ -85,6 +87,17 @@ export default function MPCardBrick({
           throw new Error(msg);
         }
 
+        let orderId: string | undefined;
+        if (onPrepareOrder) {
+          try {
+            orderId = await onPrepareOrder();
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "Error al registrar el pedido.";
+            onPaymentError(msg);
+            throw new Error(msg);
+          }
+        }
+
         const result = await initiateMPCardPayment(
           {
             amount,
@@ -93,6 +106,7 @@ export default function MPCardBrick({
             installments: formData.installments,
             payer_name: payerNameRef.current,
             payer_email: formData.payer?.email ?? payerEmail,
+            order_id: orderId,
           },
           tenantSlug
         );

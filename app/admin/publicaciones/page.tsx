@@ -92,14 +92,14 @@ export default function PublicacionesPage() {
                             thousandSeparator="."
                             decimalSeparator="," 
                             value={price}
-                            onChange={setPrice}
+                            onChange={(val) => setPrice(val as number | "")}
                             required
                         />
                         <NumberInput
                             label="Stock"
                             min={0}
                             value={stock}
-                            onChange={setStock}
+                            onChange={(val) => setStock(val as number | "")}
                             required
                         />
                     </Group>

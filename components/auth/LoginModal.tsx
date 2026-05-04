@@ -12,17 +12,17 @@ interface Props {
 
 export default function LoginModal({ onClose, onSwitchToRegister }: Props) {
     const { login, tenantSlug } = useAuth();
-    const [username, setUsername] = useState("");
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
-    async function handleSubmit(e: React.FormEvent) {
+    async function handleSubmit(e: React.SubmitEvent) {
         e.preventDefault();
         setError("");
         setLoading(true);
         try {
-            await login(username, password);
+            await login(email, password);
             onClose();
         } catch (err: unknown) {
             setError(
@@ -66,10 +66,10 @@ export default function LoginModal({ onClose, onSwitchToRegister }: Props) {
                     )}
 
                     <TextInput
-                        label="Usuario o email"
+                        label="Email"
                         placeholder="tu@email.com"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         required
                         autoFocus
                     />

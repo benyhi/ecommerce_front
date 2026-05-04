@@ -33,6 +33,7 @@ export const DEFAULT_BRAND_CONFIG: BrandConfig = {
       "TechStore: laptops, smartphones, audio, accesorios y mucho más. Envío a todo el país.",
     keywords: "tecnología, laptops, smartphones, auriculares, accesorios tech",
   },
+  shipping_cost: 1500,
 };
 
 const TENANT_BRANDING_OPTIONS: Record<string, BrandConfigOverrides> = {

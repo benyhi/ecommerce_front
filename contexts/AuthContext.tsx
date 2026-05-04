@@ -11,7 +11,7 @@ import type { User } from "@/types";
 import { getMeApi, loginApi, registerApi } from "@/lib/api";
 
 const ENABLE_ME_SYNC = false;
-const DEFAULT_TENANT = "tienda1";
+const DEFAULT_TENANT = process.env.NEXT_PUBLIC_DEFAULT_TENANT ?? "";
 
 // ─── Tenant slug detection ────────────────────────────────────────────────
 
@@ -39,7 +39,7 @@ interface AuthContextType {
     tenantSlug: string;
     isAuthenticated: boolean;
     loading: boolean;
-    login: (username: string, password: string) => Promise<void>;
+    login: (email: string, password: string) => Promise<void>;
     logout: () => void;
     register: (data: {
         username: string;
@@ -93,8 +93,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const login = useCallback(
-        async (username: string, password: string) => {
-            const res = await loginApi(username, password, tenantSlug);
+        async (email: string, password: string) => {
+            const res = await loginApi(email, password, tenantSlug);
             setAccessToken(res.access);
             setUser(res.user);
             // Update tenant slug from the user's actual tenant

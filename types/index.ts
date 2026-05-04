@@ -97,7 +97,7 @@ export interface BrandConfig {
   /** Nombre comercial/brand para textos UI */
   brand_name: string;
   /** URL absoluta o relativa del logo (puede ser null para usar el logo por defecto) */
-  logo_url: File | null;
+  logo_url: string | null;
   /** Color primario (hex, ej: "#6366f1"). Mapea a --accent */
   color_primary: string;
   /** Color secundario (hex, ej: "#06b6d4"). Mapea a --accent2 */
@@ -112,6 +112,8 @@ export interface BrandConfig {
   contact: BrandContactConfig;
   /** Metadata SEO por tenant */
   seo: BrandSeoConfig;
+  /** Costo de envío a domicilio (0 = gratis) */
+  shipping_cost?: number;
 }
 
 export interface BrandContactConfig {
@@ -128,7 +130,7 @@ export interface BrandSeoConfig {
   title: string;
   description: string;
   keywords: string;
-  seo_image?: File;
+  seo_image?: string;
 }
 
 export interface User {

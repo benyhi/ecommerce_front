@@ -21,10 +21,6 @@ interface TenantBrandingApiResponse {
     available_options: string[];
 }
 
-type TenantBrandingPayload = Partial<BrandConfig> & {
-    contact?: Partial<BrandConfig["contact"]>;
-    seo?: Partial<BrandConfig["seo"]>;
-};
 
 export async function apiFetch<T>(
     path: string,
@@ -111,29 +107,6 @@ export async function getTenantBranding(tenantSlug?: string): Promise<BrandConfi
     return apiFetch<BrandConfig>("/tenant/branding/", { tenantSlug });
 }
 
-export async function updateTenantBrandingConfig(
-    data: TenantBrandingPayload,
-    tenantSlug?: string
-): Promise<BrandConfig> {
-    const query = tenantSlug ? `?tenant=${encodeURIComponent(tenantSlug)}` : "";
-    const res = await fetch(`/api/tenant/branding${query}`, {
-        method: "PUT",
-        cache: "no-store",
-        headers: {
-            "Content-Type": "application/json",
-            ...(tenantSlug ? { "X-Tenant": tenantSlug } : {}),
-        },
-        body: JSON.stringify(data),
-    });
-
-    if (!res.ok) {
-        const errorBody = await res.text();
-        throw new Error(`Branding update error ${res.status}: ${errorBody}`);
-    }
-
-    const payload = (await res.json()) as TenantBrandingApiResponse;
-    return payload.branding;
-}
 
 // ─── Site / Homepage endpoints ───────────────────────────────────────────────
 
@@ -176,13 +149,13 @@ export async function getSitePosts(tenantSlug?: string): Promise<Post[]> {
 // ─── Auth endpoints ───────────────────────────────────────────────────────
 
 export async function loginApi(
-    username: string,
+    email: string,
     password: string,
     tenantSlug?: string
 ): Promise<LoginResponse> {
     const resolvedTenant = tenantSlug?.trim() || DEFAULT_TENANT;
     const payload = {
-        email: username.trim(),
+        email: email.trim(),
         password,
         tenant: resolvedTenant,
     };

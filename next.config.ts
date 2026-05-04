@@ -17,10 +17,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "images.unsplash.com",
       },
-      // Production CDN — ajustá el hostname a tu dominio real (ej: cdn.midominio.com)
+      // Cloudflare R2 public bucket
       {
         protocol: "https",
-        hostname: "cdn.midominio.com",
+        hostname: "*.r2.dev",
       },
       // API server images (en caso de que sirvan imágenes directo desde el backend)
       {

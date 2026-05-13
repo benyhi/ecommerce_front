@@ -13,7 +13,6 @@ import {
     Divider,
     Grid,
     Group,
-    List,
     Loader,
     Paper,
     SimpleGrid,
@@ -25,9 +24,11 @@ import {
 import { ArrowLeft, ShoppingCart, CheckCircle, Truck, Shield, Package, Box } from "lucide-react";
 import { getProduct, getProductBadges } from "@/lib/api";
 import { storeInfo } from "@/lib/storeConfig";
-import type { ProductReadOnly, ProductBadge, SelectedOption } from "@/types";
+import type { CartItem, ProductReadOnly, ProductBadge, SelectedOption } from "@/types";
 import ProductCard from "@/components/catalog/ProductCard";
 import { useCart } from "@/contexts/CartContext";
+
+const BUY_NOW_STORAGE_KEY = "buyNowCheckoutItem";
 
 function formatPrice(n: number) {
     return new Intl.NumberFormat("es-AR", {
@@ -38,14 +39,14 @@ function formatPrice(n: number) {
 export default function ProductDetailPage() {
     const params = useParams<{ id: string }>();
     const router = useRouter();
-    const { addItem, openCart } = useCart();
+    const { addItem } = useCart();
 
     const [product, setProduct] = useState<ProductReadOnly | null>(null);
     const [badges, setBadges] = useState<ProductBadge[]>([]);
     const [loading, setLoading] = useState(true);
     const [quantity, setQuantity] = useState(1);
     const [selectedOptions, setSelectedOptions] = useState<SelectedOption[]>([]);
-    const [added, setAdded] = useState<"none" | "cart" | "buy">("none");
+    const [added, setAdded] = useState<"none" | "cart">("none");
     const [activeImage, setActiveImage] = useState<string | null>(null);
 
     useEffect(() => {
@@ -110,6 +111,7 @@ export default function ProductDetailPage() {
 
     // product is narrowed to ProductReadOnly beyond this point
     const category = product.category;
+    const subcategory = product.subcategory;
     const optionGroups = product.option_groups ?? [];
 
     function toggleOption(groupId: string, groupName: string, optionId: string, maxChoices: number) {
@@ -149,13 +151,31 @@ export default function ProductDetailPage() {
     const totalPrice = unitPrice * quantity;
     const discountPercent = comparePrice ? Math.max(0, Math.round((1 - unitPrice / comparePrice) * 100)) : null;
 
-    function handleAddToCart(openAfter: boolean) {
+    function buildCartItemId(productId: string, selected: SelectedOption[]) {
+        const opts = selected
+            .map((s) => `${s.groupId}:${s.option.id}`)
+            .sort()
+            .join("|");
+        return `${productId}-${opts}`;
+    }
+
+    function handleBuyNow() {
+        if (!requiredMet || !product) return;
+        const item: CartItem = {
+            cartItemId: buildCartItemId(product.id, selectedOptions),
+            product,
+            quantity,
+            selectedOptions,
+            unitPrice,
+        };
+        sessionStorage.setItem(BUY_NOW_STORAGE_KEY, JSON.stringify([item]));
+        router.push("/checkout?mode=buy-now");
+    }
+
+    function handleAddToCart() {
         if (!requiredMet || !product) return;
         addItem(product, selectedOptions, quantity);
-        setAdded(openAfter ? "buy" : "cart");
-        if (openAfter) {
-            openCart();
-        }
+        setAdded("cart");
     }
 
     const related: ProductReadOnly[] = [];
@@ -224,7 +244,9 @@ export default function ProductDetailPage() {
                         <Stack gap="md">
                             <Group justify="space-between" align="flex-start">
                                 <div>
-                                    <Text c="dimmed" size="sm">{category.name}</Text>
+                                    <Text c="dimmed" size="sm">
+                                        {subcategory ? `${category.name} / ${subcategory.name}` : category.name}
+                                    </Text>
                                     <Title order={2} style={{ lineHeight: 1.2 }}>{product.name}</Title>
                                 </div>
                                 {product.is_offer && (
@@ -330,7 +352,7 @@ export default function ProductDetailPage() {
                                 <Button
                                     radius="md"
                                     size="md"
-                                    onClick={() => handleAddToCart(true)}
+                                    onClick={handleBuyNow}
                                     disabled={!requiredMet}
                                     fullWidth
                                 >
@@ -341,7 +363,7 @@ export default function ProductDetailPage() {
                                     size="md"
                                     variant="light"
                                     leftSection={<ShoppingCart size={16} />}
-                                    onClick={() => handleAddToCart(false)}
+                                    onClick={handleAddToCart}
                                     disabled={!requiredMet}
                                     fullWidth
                                 >
@@ -352,7 +374,7 @@ export default function ProductDetailPage() {
                                 )}
                                 {added !== "none" && (
                                     <Text size="sm" c="green" fw={600} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                        <CheckCircle size={16} /> {added === "buy" ? "Agregado. Abre el carrito para finalizar." : "Producto agregado al carrito."}
+                                        <CheckCircle size={16} /> Producto agregado al carrito.
                                     </Text>
                                 )}
                             </Stack>

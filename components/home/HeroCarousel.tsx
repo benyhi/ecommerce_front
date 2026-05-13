@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { promoSlides } from "@/lib/mockData";
 import type { CarouselBannerPublic } from "@/types";
 import Link from "next/link";
 
@@ -33,29 +32,31 @@ type HeroCarouselProps = {
 };
 
 export default function HeroCarousel({ banners }: HeroCarouselProps) {
-    // Use API banners if provided and non-empty, otherwise fall back to mock slides
-    const slides: Slide[] =
-        banners && banners.length > 0
-            ? bannersToSlides(banners)
-            : promoSlides.map((s) => ({ ...s, id: s.id, link: "/catalogo" }));
+    const slides: Slide[] = banners && banners.length > 0 ? bannersToSlides(banners) : [];
 
     const [current, setCurrent] = useState(0);
     const [paused, setPaused] = useState(false);
 
-    const next = useCallback(() => setCurrent((c) => (c + 1) % slides.length), [slides.length]);
-    const prev = () => setCurrent((c) => (c - 1 + slides.length) % slides.length);
-
-    useEffect(() => {
-        setCurrent(0);
+    const next = useCallback(() => {
+        if (slides.length === 0) return;
+        setCurrent((c) => (c + 1) % slides.length);
     }, [slides.length]);
 
+    const prev = () => {
+        if (slides.length === 0) return;
+        setCurrent((c) => (c - 1 + slides.length) % slides.length);
+    };
+
     useEffect(() => {
-        if (paused) return;
+        if (paused || slides.length <= 1) return;
         const id = setInterval(next, 5000);
         return () => clearInterval(id);
-    }, [paused, next]);
+    }, [paused, next, slides.length]);
 
-    const slide = slides[current];
+    if (slides.length === 0) return null;
+
+    const currentIndex = Math.min(current, slides.length - 1);
+    const slide = slides[currentIndex];
 
     return (
         <div
@@ -68,9 +69,9 @@ export default function HeroCarousel({ banners }: HeroCarouselProps) {
                     key={s.id}
                     style={{
                         position: "absolute", inset: 0,
-                        opacity: i === current ? 1 : 0,
+                        opacity: i === currentIndex ? 1 : 0,
                         transition: "opacity .7s ease",
-                        zIndex: i === current ? 1 : 0,
+                        zIndex: i === currentIndex ? 1 : 0,
                     }}
                 >
                     {/* Background image */}
@@ -104,7 +105,7 @@ export default function HeroCarousel({ banners }: HeroCarouselProps) {
                 }}
             >
                 <div
-                    key={current}
+                    key={currentIndex}
                     className="animate-fade-in"
                     style={{ maxWidth: 560 }}
                 >
@@ -200,9 +201,9 @@ export default function HeroCarousel({ banners }: HeroCarouselProps) {
                         key={i}
                         onClick={() => setCurrent(i)}
                         style={{
-                            width: i === current ? 24 : 8, height: 8,
+                            width: i === currentIndex ? 24 : 8, height: 8,
                             borderRadius: 9999, border: "none", cursor: "pointer",
-                            background: i === current ? "#fff" : "rgba(255,255,255,.4)",
+                            background: i === currentIndex ? "#fff" : "rgba(255,255,255,.4)",
                             transition: "all .3s ease",
                             padding: 0,
                         }}

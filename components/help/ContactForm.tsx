@@ -3,13 +3,11 @@
 import React, { useState } from "react";
 import { Send, CheckCircle } from "lucide-react";
 import { TextInput, Textarea, Select, Button, Stack, Paper, Title, Text, Grid, Center } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
 
 export default function ContactForm() {
     const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
     const [loading, setLoading] = useState(false);
     const [sent, setSent] = useState(false);
-    const [error, setError] = useState("");
 
     function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
         setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -18,7 +16,6 @@ export default function ContactForm() {
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         setLoading(true);
-        setError("");
         // Simulate API call
         await new Promise((r) => setTimeout(r, 1200));
         setSent(true);

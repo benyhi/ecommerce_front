@@ -42,6 +42,10 @@ export interface Product {
   images?: string[];
   /** Optional option groups attached directly to the product */
   option_groups?: OptionGroup[];
+  category?: string | CategoryBasic | null;
+  category_detail?: CategoryBasic | null;
+  subcategory?: string | SubcategoryBasic | null;
+  subcategory_detail?: SubcategoryBasic | null;
 }
 
 export interface ProductAttribute {
@@ -62,6 +66,7 @@ export interface ProductBadge {
 
 export interface ProductReadOnly extends Product {
   category: CategoryBasic;
+  subcategory: SubcategoryBasic | null;
   option_groups: OptionGroup[];
   attributes: ProductAttribute[];
 }
@@ -72,12 +77,30 @@ export interface CategoryBasic {
   order: number;
 }
 
+export interface SubcategoryBasic {
+  id: string;
+  name: string;
+  order: number;
+  category: CategoryBasic;
+}
+
+export interface Subcategory {
+  id: string;
+  category: string;
+  category_detail: CategoryBasic;
+  name: string;
+  order: number;
+  active: boolean;
+  products: Product[];
+}
+
 export interface Category {
   id: string;
   name: string;
   active: boolean;
   order: number;
   products: Product[];
+  subcategories?: Subcategory[];
 }
 
 // ─── Auth / Tenant ───────────────────────────────────────────────────────
@@ -139,7 +162,7 @@ export interface User {
   username: string;
   first_name: string;
   last_name: string;
-  role: "admin" | "employee" | "editor" | "read";
+  role: "admin" | "employee" | "editor" | "read" | "customer";
   tenant: TenantBasic;
 }
 

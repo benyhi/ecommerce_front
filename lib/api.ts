@@ -15,13 +15,6 @@ interface FetchOptions extends RequestInit {
     tenantSlug?: string;
 }
 
-interface TenantBrandingApiResponse {
-    tenant: string;
-    branding: BrandConfig;
-    available_options: string[];
-}
-
-
 export async function apiFetch<T>(
     path: string,
     { token, tenantSlug, ...rest }: FetchOptions = {}
@@ -89,21 +82,6 @@ export async function getProduct(
  * GET /api/tenant/branding/   (X-Tenant header injected automatically)
  */
 export async function getTenantBranding(tenantSlug?: string): Promise<BrandConfig> {
-    try {
-        const query = tenantSlug ? `?tenant=${encodeURIComponent(tenantSlug)}` : "";
-        const res = await fetch(`/api/tenant/branding${query}`, {
-            cache: "no-store",
-            headers: tenantSlug ? { "X-Tenant": tenantSlug } : undefined,
-        });
-
-        if (res.ok) {
-            const payload = (await res.json()) as TenantBrandingApiResponse;
-            return payload.branding;
-        }
-    } catch {
-        // fallback below
-    }
-
     return apiFetch<BrandConfig>("/tenant/branding/", { tenantSlug });
 }
 
@@ -184,6 +162,44 @@ export async function getMeApi(token: string, tenantSlug?: string): Promise<User
     }
 
     throw lastError ?? new Error("Unable to fetch current user profile");
+}
+
+export async function getProfileApi(token: string, tenantSlug?: string): Promise<User> {
+    return apiFetch<User>("/auth/profile/", {
+        method: "GET",
+        token,
+        tenantSlug,
+    });
+}
+
+export async function updateProfileApi(
+    token: string,
+    data: Pick<User, "first_name" | "last_name" | "email">,
+    tenantSlug?: string
+): Promise<User> {
+    return apiFetch<User>("/auth/profile/", {
+        method: "PATCH",
+        token,
+        tenantSlug,
+        body: JSON.stringify(data),
+    });
+}
+
+export async function changePasswordApi(
+    token: string,
+    data: {
+        current_password: string;
+        new_password: string;
+        new_password_confirm: string;
+    },
+    tenantSlug?: string
+): Promise<{ detail: string }> {
+    return apiFetch<{ detail: string }>("/auth/change-password/", {
+        method: "POST",
+        token,
+        tenantSlug,
+        body: JSON.stringify(data),
+    });
 }
 
 export async function registerApi(

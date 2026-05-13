@@ -12,6 +12,7 @@ import CartDrawer from "@/components/layout/CartDrawer";
 import { getBrandCssStyle } from "@/lib/brandStyles";
 import { resolveTenantSlug } from "@/lib/tenant";
 import { getBrandConfigForTenant } from "@/lib/tenantBranding";
+import { getTenantBranding } from "@/lib/api";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -30,7 +31,7 @@ async function getRequestBranding() {
 
   return {
     tenantSlug,
-    branding: getBrandConfigForTenant(tenantSlug),
+    branding: await getTenantBranding(tenantSlug).catch(() => getBrandConfigForTenant(tenantSlug)),
   };
 }
 

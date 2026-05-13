@@ -59,6 +59,12 @@ export default function CatalogoPage() {
                 if (!p.active) continue;
                 list.push({ product: p, category: cat });
             }
+            for (const subcat of cat.subcategories ?? []) {
+                for (const p of subcat.products ?? []) {
+                    if (!p.active) continue;
+                    list.push({ product: p, category: cat });
+                }
+            }
         }
         return list;
     }, [categories]);
@@ -97,7 +103,11 @@ export default function CatalogoPage() {
         const results: Array<{ product: Product; category: Category }> = [];
         for (const cat of categories) {
             if (activeCategoryId !== null && cat.id !== activeCategoryId) continue;
-            for (const p of cat.products) {
+            const products = [
+                ...cat.products,
+                ...(cat.subcategories ?? []).flatMap((subcat) => subcat.products ?? []),
+            ];
+            for (const p of products) {
                 if (!p.active) continue;
                 const price = parseFloat(p.price);
                 if (

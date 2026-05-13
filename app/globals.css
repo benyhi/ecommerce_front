@@ -150,6 +150,11 @@ body {
 .input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(99,102,241,.15); }
 .input::placeholder { color: var(--text-muted); }
 
+.mantine-Select-option[aria-selected="true"] {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
 /* ─── Animations ─────────────────────────────────────────────────── */
 @keyframes fadeIn  { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
 @keyframes slideIn { from { opacity:0; transform: translateX(16px); } to { opacity:1; transform: translateX(0); } }
@@ -167,4 +172,26 @@ body {
   backdrop-filter: blur(4px);
   z-index: 40;
   animation: fadeIn .15s ease both;
+}
+
+@media (max-width: 860px) {
+  .checkout-payment-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+
+  .profile-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .checkout-summary {
+    position: static !important;
+    order: -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .checkout-address-grid {
+    grid-template-columns: 1fr !important;
+  }
 }

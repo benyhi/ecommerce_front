@@ -21,6 +21,7 @@ export interface CheckoutPayload {
   payer_name?: string;
   payer_email?: string;
   installments?: number;
+  shipping_cost?: number;
   shipping_street?: string;
   shipping_city?: string;
   shipping_province?: string;
@@ -35,6 +36,7 @@ export interface CheckoutResponse {
   status: string;
   checkout_url: string | null;
   total: string;
+  shipping_cost: string;
 }
 
 export interface PrepareCheckoutPayload {
@@ -45,6 +47,7 @@ export interface PrepareCheckoutPayload {
   items: CheckoutItem[];
   coupon_code?: string;
   notes?: string;
+  shipping_cost?: number;
   shipping_street?: string;
   shipping_city?: string;
   shipping_province?: string;
@@ -55,6 +58,7 @@ export interface PrepareCheckoutResponse {
   order_id: string;
   order_number: string;
   total: string;
+  shipping_cost: string;
 }
 
 export async function prepareCheckout(

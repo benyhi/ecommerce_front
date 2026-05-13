@@ -171,7 +171,9 @@ export default function ProductModal({ product, onClose }: Props) {
                 >
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1rem 1.25rem", borderBottom: "1px solid var(--border)" }}>
                         <div>
-                            <p style={{ fontSize: ".78rem", color: "var(--text-muted)", marginBottom: ".25rem" }}>{product.category?.name}</p>
+                            <p style={{ fontSize: ".78rem", color: "var(--text-muted)", marginBottom: ".25rem" }}>
+                                {product.subcategory ? `${product.category?.name} / ${product.subcategory.name}` : product.category?.name}
+                            </p>
                             <h2 style={{ color: "var(--text-primary)", fontWeight: 800, fontSize: "1.35rem" }}>{product.name}</h2>
                         </div>
                         <button

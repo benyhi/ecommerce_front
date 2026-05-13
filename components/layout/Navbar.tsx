@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
     ActionIcon,
     Badge,
@@ -36,6 +36,7 @@ const navLinks = [
 
 export default function Navbar() {
     const pathname = usePathname();
+    const router = useRouter();
     const { theme, toggleTheme } = useTheme();
     const { itemCount, openCart } = useCart();
     const { user, isAuthenticated, logout } = useAuth();
@@ -78,7 +79,7 @@ export default function Navbar() {
                 </Badge>
             </Box>
             <Box style={{ padding: ".5rem" }}>
-                <MenuBtn icon={<Settings size={14} />} label="Perfil" onClick={() => setUserMenuOpen(false)} />
+                <MenuBtn icon={<Settings size={14} />} label="Perfil" onClick={() => { setUserMenuOpen(false); router.push("/perfil"); }} />
                 <MenuBtn icon={<LogOut size={14} />} label="Cerrar sesión" onClick={handleLogout} danger />
             </Box>
         </>

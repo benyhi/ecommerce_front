@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { useCart } from "@/contexts/CartContext";
 import { checkout, prepareCheckout, validateCoupon, getEnabledGateways, type GatewayConfig, type GatewayId, type CouponValidationResult } from "@/lib/payments";
 import { getTenantBranding } from "@/lib/api";
+import type { CartItem } from "@/types";
 import { ArrowLeft, ArrowRight, CreditCard, Landmark, Smartphone, Banknote, ShoppingCart, Loader2, Tag, X, CheckCircle, AlertCircle, Truck, MapPin } from "lucide-react";
 
 const MPCardBrick = dynamic(() => import("@/components/checkout/MPCardBrick"), { ssr: false, loading: () => null });
+const BUY_NOW_STORAGE_KEY = "buyNowCheckoutItem";
 
 type DeliveryType = "shipping" | "pickup";
 type PaymentMethod = GatewayId | "cash";
@@ -117,7 +119,9 @@ function StepIndicator({ step }: { step: 1 | 2 }) {
 
 export default function CheckoutPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { items, total, clearCart, closeCart } = useCart();
+  const isBuyNow = searchParams.get("mode") === "buy-now";
 
   const [step, setStep] = useState<1 | 2>(1);
   const [deliveryType, setDeliveryType] = useState<DeliveryType>("shipping");
@@ -139,6 +143,7 @@ export default function CheckoutPage() {
   const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null);
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponError, setCouponError] = useState<string | null>(null);
+  const [buyNowItems, setBuyNowItems] = useState<CartItem[] | null>(null);
 
   const [redirect, setRedirect] = useState<RedirectState>({ active: false, destination: "", message: "" });
 
@@ -153,6 +158,20 @@ export default function CheckoutPage() {
       setGateways(list);
     }).finally(() => setLoadingGateways(false));
   }, [closeCart]);
+
+  useEffect(() => {
+    if (!isBuyNow) {
+      setBuyNowItems(null);
+      return;
+    }
+    try {
+      const stored = sessionStorage.getItem(BUY_NOW_STORAGE_KEY);
+      const parsed = stored ? JSON.parse(stored) : [];
+      setBuyNowItems(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setBuyNowItems([]);
+    }
+  }, [isBuyNow]);
 
   // Auto-seleccionar método de pago cuando cambia deliveryType o gateways
   useEffect(() => {
@@ -170,10 +189,24 @@ export default function CheckoutPage() {
     ? ["cash", ...gateways.map((gw) => gw.gateway as GatewayId)]
     : gateways.map((gw) => gw.gateway as GatewayId);
 
+  const checkoutItems = isBuyNow ? buyNowItems ?? [] : items;
+  const checkoutTotal = isBuyNow
+    ? checkoutItems.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0)
+    : total;
+  const checkoutReady = !isBuyNow || buyNowItems !== null;
   const shippingForTotal = deliveryType === "shipping" ? shippingCost : 0;
   const isCardPayment = selectedPayment === "card" || selectedPayment === "debit";
   const discount = appliedCoupon ? parseFloat(appliedCoupon.discount_amount ?? "0") : 0;
-  const finalTotal = Math.max(0, total + shippingForTotal - discount);
+  const finalTotal = Math.max(0, checkoutTotal + shippingForTotal - discount);
+
+  function clearCheckoutSource() {
+    if (isBuyNow) {
+      sessionStorage.removeItem(BUY_NOW_STORAGE_KEY);
+      setBuyNowItems([]);
+      return;
+    }
+    clearCart();
+  }
 
   async function handleApplyCoupon() {
     const code = couponCode.trim();
@@ -181,7 +214,7 @@ export default function CheckoutPage() {
     setCouponLoading(true);
     setCouponError(null);
     try {
-      const result = await validateCoupon(code, total);
+      const result = await validateCoupon(code, checkoutTotal);
       if (result.valid) {
         setAppliedCoupon(result);
         setCouponError(null);
@@ -204,7 +237,7 @@ export default function CheckoutPage() {
   }
 
   function handleMPCardSuccess(paymentId: string, paymentStatus: string) {
-    clearCart();
+    clearCheckoutSource();
     if (paymentStatus === "approved") {
       setRedirect({ active: true, destination: "confirmación", message: "¡Pago aprobado! Redirigiendo a la confirmación." });
       setTimeout(() => router.push(`/checkout/exito?payment_id=${paymentId}`), 1800);
@@ -226,8 +259,22 @@ export default function CheckoutPage() {
     return p as "cash" | "transfer" | "card" | "mercadopago";
   }
 
+  function validateBuyerAndShipping() {
+    if (!payerName.trim()) return "Por favor ingresa tu nombre completo.";
+    if (!payerEmail.trim() || !payerEmail.includes("@")) return "Por favor ingresa un email valido.";
+    if (deliveryType === "shipping") {
+      if (!payerPhone.trim()) return "Por favor ingresa un telefono de contacto.";
+      if (!shippingAddress.street.trim() || !shippingAddress.city.trim() || !shippingAddress.province.trim() || !shippingAddress.postalCode.trim()) {
+        return "Completa la direccion de envio antes de continuar.";
+      }
+    }
+    return null;
+  }
+
   async function handlePay() {
-    if (!selectedPayment || items.length === 0) return;
+    if (!selectedPayment || checkoutItems.length === 0) return;
+    const validationError = validateBuyerAndShipping();
+    if (validationError) { setError(validationError); return; }
 
     if (!payerName.trim()) { setError("Por favor ingresá tu nombre completo."); return; }
     if (!payerEmail.trim() || !payerEmail.includes("@")) { setError("Por favor ingresá un email válido."); return; }
@@ -241,7 +288,7 @@ export default function CheckoutPage() {
         customer_phone: payerPhone,
         delivery_type: deliveryType,
         payment_method: toPaymentMethod(selectedPayment),
-        items: items.map((i) => ({
+        items: checkoutItems.map((i) => ({
           product: i.product.id,
           product_name: i.product.name,
           quantity: i.quantity,
@@ -249,13 +296,14 @@ export default function CheckoutPage() {
         })),
         coupon_code: appliedCoupon?.code ?? undefined,
         installments: isCardPayment ? installments : 1,
+        shipping_cost: shippingForTotal,
         shipping_street: shippingAddress.street,
         shipping_city: shippingAddress.city,
         shipping_province: shippingAddress.province,
         shipping_postal_code: shippingAddress.postalCode,
       });
 
-      clearCart();
+      clearCheckoutSource();
 
       if (result.checkout_url) {
         setRedirect({ active: true, destination: "MercadoPago", message: "Será redirigido a MercadoPago para completar el pago de forma segura." });
@@ -297,7 +345,15 @@ export default function CheckoutPage() {
   }
 
   // ── Carrito vacío ────────────────────────────────────────────────────────
-  if (items.length === 0) {
+  if (!checkoutReady) {
+    return (
+      <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Loader2 size={28} style={{ animation: "spin 1s linear infinite", color: "var(--accent)" }} />
+      </div>
+    );
+  }
+
+  if (checkoutItems.length === 0) {
     return (
       <div style={{ maxWidth: 640, margin: "4rem auto", padding: "0 1.5rem", textAlign: "center" }}>
         <ShoppingCart size={48} style={{ color: "var(--text-muted)", marginBottom: "1rem" }} />
@@ -392,7 +448,7 @@ export default function CheckoutPage() {
                 onChange={(e) => setShippingAddress((a) => ({ ...a, street: e.target.value }))}
                 style={inputStyle}
               />
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: ".75rem" }}>
+              <div className="checkout-address-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: ".75rem" }}>
                 <input
                   type="text" placeholder="Ciudad"
                   value={shippingAddress.city}
@@ -471,7 +527,7 @@ export default function CheckoutPage() {
         </button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,340px)", gap: "2rem", alignItems: "start" }}>
+      <div className="checkout-payment-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,340px)", gap: "2rem", alignItems: "start" }}>
 
         {/* Left: formulario de pago */}
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
@@ -491,7 +547,7 @@ export default function CheckoutPage() {
                 style={inputStyle}
               />
               <input
-                type="tel" placeholder="Teléfono (opcional)" value={payerPhone}
+                type="tel" placeholder={deliveryType === "shipping" ? "Telefono" : "Telefono (opcional)"} value={payerPhone}
                 onChange={(e) => setPayerPhone(e.target.value)}
                 style={inputStyle}
               />
@@ -618,21 +674,27 @@ export default function CheckoutPage() {
           {selectedPayment === "mercadopago" ? (
             <MPCardBrick
               amount={finalTotal}
-              payerName={payerName}
-              payerEmail={payerEmail}
-              onPrepareOrder={async () => {
-                const res = await prepareCheckout({
+	              payerName={payerName}
+	              payerEmail={payerEmail}
+	              onPrepareOrder={async () => {
+	                const validationError = validateBuyerAndShipping();
+	                if (validationError) {
+	                  setError(validationError);
+	                  throw new Error(validationError);
+	                }
+	                const res = await prepareCheckout({
                   customer_name: payerName,
                   customer_email: payerEmail,
                   customer_phone: payerPhone,
                   delivery_type: deliveryType,
-                  items: items.map((i) => ({
+                  items: checkoutItems.map((i) => ({
                     product: i.product.id,
                     product_name: i.product.name,
                     quantity: i.quantity,
                     unit_price: i.unitPrice,
                   })),
                   coupon_code: appliedCoupon?.code ?? undefined,
+                  shipping_cost: shippingForTotal,
                   shipping_street: shippingAddress.street,
                   shipping_city: shippingAddress.city,
                   shipping_province: shippingAddress.province,
@@ -661,10 +723,10 @@ export default function CheckoutPage() {
         </div>
 
         {/* Right: resumen del pedido */}
-        <aside style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 16, padding: "1.5rem", position: "sticky", top: "1rem" }}>
+        <aside className="checkout-summary" style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 16, padding: "1.5rem", position: "sticky", top: "1rem" }}>
           <h2 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "1rem" }}>Resumen del pedido</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: ".75rem", maxHeight: 360, overflowY: "auto" }}>
-            {items.map((item) => (
+            {checkoutItems.map((item) => (
               <div key={item.cartItemId} style={{ display: "flex", gap: ".75rem", alignItems: "center" }}>
                 <div style={{ width: 50, height: 50, borderRadius: 8, overflow: "hidden", background: "var(--bg-card)", border: "1px solid var(--border)", flexShrink: 0 }}>
                   {item.product.image_url ? (
@@ -684,7 +746,7 @@ export default function CheckoutPage() {
           <div style={{ borderTop: "1px solid var(--border)", marginTop: "1rem", paddingTop: "1rem", display: "flex", flexDirection: "column", gap: ".5rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: ".9rem", color: "var(--text-muted)" }}>
               <span>Subtotal</span>
-              <span>{formatPrice(total)}</span>
+              <span>{formatPrice(checkoutTotal)}</span>
             </div>
             {deliveryType === "shipping" && (
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: ".9rem", color: "var(--text-muted)" }}>

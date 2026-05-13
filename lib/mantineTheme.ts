@@ -100,12 +100,6 @@ export const mantineTheme: MantineThemeOverride = {
           color: 'var(--text-primary)',
           fontWeight: 500,
         },
-        option: {
-          '&[aria-selected=true]': {
-            backgroundColor: 'var(--accent-light)',
-            color: 'var(--accent)',
-          },
-        },
       }),
     },
     Accordion: {

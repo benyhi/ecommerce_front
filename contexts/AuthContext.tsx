@@ -8,7 +8,7 @@ import React, {
     useCallback,
 } from "react";
 import type { User } from "@/types";
-import { getMeApi, loginApi, registerApi } from "@/lib/api";
+import { getMeApi, loginApi, registerApi, updateProfileApi } from "@/lib/api";
 
 const ENABLE_ME_SYNC = false;
 const DEFAULT_TENANT = process.env.NEXT_PUBLIC_DEFAULT_TENANT ?? "";
@@ -41,6 +41,7 @@ interface AuthContextType {
     loading: boolean;
     login: (email: string, password: string) => Promise<void>;
     logout: () => void;
+    updateProfile: (data: Pick<User, "first_name" | "last_name" | "email">) => Promise<User>;
     register: (data: {
         username: string;
         email: string;
@@ -116,6 +117,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem("user");
     }, []);
 
+    const updateProfile = useCallback(
+        async (data: Pick<User, "first_name" | "last_name" | "email">) => {
+            if (!accessToken) throw new Error("No hay sesiÃ³n activa.");
+            const updated = await updateProfileApi(accessToken, data, tenantSlug);
+            setUser(updated);
+            localStorage.setItem("user", JSON.stringify(updated));
+            return updated;
+        },
+        [accessToken, tenantSlug]
+    );
+
     const register = useCallback(
         async (data: {
             username: string;
@@ -147,6 +159,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 loading,
                 login,
                 logout,
+                updateProfile,
                 register,
             }}
         >
